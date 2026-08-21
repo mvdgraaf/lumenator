@@ -13,7 +13,7 @@ public:
 
     bool begin();
 
-    static void update();
+    void update() const;
     bool isConnected() const;
 
     static IPAddress localIP();

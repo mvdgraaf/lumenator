@@ -1,9 +1,15 @@
 #include "config.h"
 
-bool dhcpEnabled = false; // Set to false for static IP
-bool useArtnet = true;
-bool useSACN = false;
-IPAddress ipAddress(192, 168, 1, 100);
+Preferences preferences;
+
+bool dhcpEnabled = true; // Set to false for static IP
+bool artnetEnabled = true;
+bool sacnEnabled = false;
+uint16_t dmxUniverse = 1;
+IPAddress ipAddress(192, 168, 2, 100);
+IPAddress dns(192, 168, 2, 254);
+IPAddress gatewayAddress(192, 168, 2, 1);
+IPAddress subnetMask(255, 255, 255, 0);
 
 bool enableDisableDHCP() {
     dhcpEnabled = !dhcpEnabled;
@@ -11,13 +17,47 @@ bool enableDisableDHCP() {
 }
 
 bool enableDisableArtnet() {
-    if (useSACN) useSACN = false;
-    useArtnet = !useArtnet;
+    if (sacnEnabled) sacnEnabled = false;
+    artnetEnabled = !artnetEnabled;
     return true;
 }
 
 bool enableDisableSACN() {
-    if (useArtnet) useArtnet = false;
-    useSACN = !useSACN;
+    if (artnetEnabled) artnetEnabled = false;
+    sacnEnabled = !sacnEnabled;
     return true;
+}
+
+void loadConfig() {
+    preferences.begin("config", true);
+
+    //dhcpEnabled = preferences.getBool("dhcpEnabled", false);
+    artnetEnabled = preferences.getBool("useArtnet", true);
+    sacnEnabled = preferences.getBool("useSACN", false);
+    dmxUniverse = preferences.getUInt("universe", 1);
+
+    ipAddress = IPAddress(preferences.getUInt("ip", (uint32_t)IPAddress(192, 168, 2, 100)));
+    dns = IPAddress(preferences.getUInt("dns", (uint32_t)IPAddress(192, 168, 2, 254)));
+    gatewayAddress = IPAddress(preferences.getUInt("gateway", (uint32_t)IPAddress(192, 168, 2, 1)));
+    subnetMask = IPAddress(preferences.getUInt("subnetMask", (uint32_t)IPAddress(255, 255, 255, 0)));
+
+    preferences.end();
+    Serial.println("[Config] Loaded config");
+}
+
+void saveConfig() {
+    preferences.begin("config", false);
+
+    preferences.putBool("dhcpEnabled", dhcpEnabled);
+    preferences.putBool("useArtnet", artnetEnabled);
+    preferences.putBool("useSACN", sacnEnabled);
+    preferences.putUInt("universe", dmxUniverse);
+
+    preferences.putUInt("ip", ipAddress);
+    preferences.putUInt("dns", dns);
+    preferences.putUInt("gateway", gatewayAddress);
+    preferences.putUInt("subnetMask", subnetMask);
+
+    preferences.end();
+    Serial.println("[Config] Saved config");
 }

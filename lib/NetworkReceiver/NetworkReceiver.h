@@ -13,9 +13,11 @@ public:
 
     bool begin();
     void end();
+    void configure(uint16_t startUniverse, int totalPixels);
     void poll();
 
     const DMXBuffer& getDMX() const { return _dmx; }
+
 
 private:
     EthernetUDP _udpArt;
@@ -23,6 +25,10 @@ private:
     DMXBuffer _dmx;
     static const int BUF_SIZE = 1024;
     uint8_t _buf[BUF_SIZE];
+
+    uint16_t _startUniverse;
+    uint16_t _universeCount;
+    bool _isUniverseInRange(uint16_t universe) const;
 
     void _handleArt(int len, const IPAddress& remoteIP, uint16_t remotePort);
     void _handleSacn(int len, IPAddress remoteIP, uint16_t remotePort);

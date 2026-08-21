@@ -1,6 +1,8 @@
 #ifndef LUMENATOR_CONFIG_H
 #define LUMENATOR_CONFIG_H
 #include <IPAddress.h>
+#include <Arduino.h>
+#include <Preferences.h>
 
 #define FIRMWARE_VERSION 0.10
 
@@ -25,15 +27,29 @@
 #define OUTPUT_3 41
 #define OUTPUT_4 42
 
+#define NUM_PIXELS 16
+
+#define I2C_SDA 33
+#define I2C_SCL 34
 
 // --- NETWORK CONFIGURATION ---
-extern bool useArtnet;
-extern bool useSACN;
+extern bool artnetEnabled; // 
+extern bool sacnEnabled;
 extern bool dhcpEnabled; // Set to false for static IP
+extern uint16_t dmxUniverse;
 extern IPAddress ipAddress;
+extern IPAddress dns;
+extern IPAddress gatewayAddress;
+extern IPAddress subnetMask;
 
 bool enableDisableDHCP();
 bool enableDisableArtnet();
 bool enableDisableSACN();
+
+// --- CONFIG Functionalities ---
+
+extern Preferences preferences;
+void saveConfig();
+void loadConfig();
 
 #endif //LUMENATOR_CONFIG_H

@@ -27,19 +27,43 @@ bool EthernetManager::begin() {
     _printMac();
 
     // Start DHCP
-    if (EthernetClass::begin(_mac, ETH_DHCP_TIMEOUT_MS) == 0) {
-        Serial.println("[ETH] DHCP failed — did not receive ip address");
-        _connected = false;
-        return false;
-    }
+    if (dhcpEnabled) {
+        if (EthernetClass::begin(_mac, ETH_DHCP_TIMEOUT_MS) == 0) {
+            Serial.println("[ETH] DHCP failed — did not receive ip address");
+            _connected = false;
+            return false;
+        }
 
-    _connected = true;
-    printInfo();
+        if (EthernetClass::linkStatus() != LinkON) {
+            Serial.println("[ETH] Warning: No network cable connected");
+            _connected = false;
+        }
+
+        _connected = true;
+        printInfo();
+    } else {
+        EthernetClass::begin(_mac, ipAddress, dns, gatewayAddress, subnetMask);
+        if (EthernetClass::localIP() == IPAddress(0,0,0,0)) {
+            Serial.println("[ETH] Error: failed to set static ip");
+            _connected = false;
+            return false;
+        }
+
+        if (EthernetClass::linkStatus() != LinkON) {
+            Serial.println("[ETH] Warning: No network cable connected");
+            _connected = false;
+        }
+        _connected = true;
+    }
     return true;
 }
 
-void EthernetManager::update() {
-    EthernetClass::maintain();
+void EthernetManager::update() const {
+    if (dhcpEnabled) {
+        if (isConnected()) {
+            EthernetClass::maintain();
+        }
+    }
 }
 
 bool EthernetManager::isConnected() const {
@@ -85,7 +109,7 @@ bool EthernetManager::testConnection(const char* host) const {
         client.print("Connection: close\r\n\r\n");
 
         // Wacht maximaal 3 seconden op antwoord van de server
-        unsigned long timeout = millis();
+        const unsigned long timeout = millis();
         while (client.available() == 0) {
             if (millis() - timeout > 3000) {
                 Serial.println("[ETH] HTTP timeout! Geen antwoord van server.");
@@ -96,7 +120,7 @@ bool EthernetManager::testConnection(const char* host) const {
 
         // Lees de eerste regel van het antwoord (bijv. "HTTP/1.1 200 OK" of "HTTP/1.1 301 Moved")
         if (client.available()) {
-            String line = client.readStringUntil('\n');
+            const String line = client.readStringUntil('\n');
             Serial.print("[ETH] Antwoord ontvangen: ");
             Serial.println(line);
         }

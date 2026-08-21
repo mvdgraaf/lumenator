@@ -9,7 +9,7 @@ bool SDCardManager::begin() {
     pinMode(SD_MISO_PIN, INPUT_PULLUP);
     sdSPI.begin(SD_SCLK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
 
-    // Mount the SD card on the dedicated HSPI bus
+    // Mount the SD card
     Serial.println("[SDCardManager] Mounting SD Card on dedicated HSPI bus...");
     if (SD.begin(SD_CS_PIN, sdSPI, SD_SPI_FREQUENCY)) {
         Serial.println("[SDCardManager] SDCard MOUNT SUCCESS");
@@ -97,7 +97,7 @@ bool SDCardManager::isMounted() const {
     return cardSize > 0;
 }
 
-void performUpdate(File& firmwareFile, const size_t& size) {
+static void performUpdate(File& firmwareFile, const size_t& size) {
     if (Update.begin(size)) {
         Serial.println("[SDCardManager] Update started, writing firmware...");
         const size_t written = Update.writeStream(firmwareFile);
@@ -117,11 +117,11 @@ void performUpdate(File& firmwareFile, const size_t& size) {
     }
 }
 
-void checkForUpdate() {
+static void checkForUpdate() {
     Serial.println("[SDCardManager] Checking for updates...");
     File file = SD.open("/firmware.bin");
     if (file) {
-        size_t size = file.size();
+        const size_t size = file.size();
         if (file.size() > 0) {
             Serial.println("[SDCardManager] Update file found! Starting update...");
             performUpdate(file, size);

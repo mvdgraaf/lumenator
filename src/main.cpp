@@ -3,57 +3,92 @@
 #include "EthernetManager.h"
 #include "NetworkReceiver.h"
 #include "SDCardManager.h"
+#include "LightEngine.h"
+#include "ScreenManager.h"
 
-EthernetManager eth;
-NetworkReceiver netRx;
-SDCardManager sdCard;
+static EthernetManager eth;
+static NetworkReceiver netRx;
+static SDCardManager sdCard;
+static ScreenManager screen;
+static LightEngine lightEngine(netRx);
 
 // --- NETWERK TAAK (CORE 0) ---
-void networkTask(void* parameter) {
+static void networkTask(void* parameter) {
     if (eth.begin()) {
+        if (!eth.isConnected()) {
+            screen.showMessage("Nerwork", "not connected", 1000);
+        }
         Serial.println("[MAIN] Ethernet connected");
-        eth.testConnection("www.google.com");
+        auto result = eth.testConnection("www.google.com");
         netRx.begin();
     }
 
     while (true) {
         eth.update();
         netRx.poll();
-        vTaskDelay(pdMS_TO_TICKS(2)); // Rustpauze voor de Watchdog
+        lightEngine.update();
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
+static void screenTask(void* parameter) {
+    while (true) {
+        screen.update();
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
 
 // --- SETUP (CORE 1) ---
 void setup() {
     Serial.begin(115200);
-    unsigned long start = millis();
+    const unsigned long start = millis();
     while (!Serial && (millis() - start < 4000)) {
         delay(10);
     }
 
     Serial.println("[MAIN] Starting Lumenator...");
+    screen.begin();
+    // Load configuration from non volatile memory
+    loadConfig();
 
-    // 1. Ensure the Ethernet chip is in standby and doesn't interfere during boot
+    // Ensure the Ethernet chip is in standby and doesn't interfere during boot
     pinMode(W5500_RST, OUTPUT);
     digitalWrite(W5500_RST, HIGH);
     pinMode(W5500_CS, OUTPUT);
     digitalWrite(W5500_CS, HIGH);
 
-    // 2. Initialize the SD card on the dedicated HSPI bus
-    if (sdCard.begin()) {
-        Serial.println("[MAIN] SD Card initialization successful");
+    // Initialize the SD card
+    // if (sdCard.begin()) {
+    //     Serial.println("[MAIN] SD Card initialization successful");
+    //
+    //     // Run the test operations
+    //     sdCard.runTests();
+    //     sdCard.unmount();
+    // } else {
+    //     Serial.println("[MAIN] SD Card initialization failed");
+    // }
 
-        // Run the test operations
-        sdCard.runTests();
-        sdCard.unmount();
-    } else {
-        Serial.println("[MAIN] SD Card initialization failed");
-    }
-
-    // 3. Start the network task on Core 0
-    // The EthernetManager opens its own standard SPI bus (VSPI/SPI2) on pins 11, 12, 13
-    xTaskCreatePinnedToCore(networkTask, "NetworkTask", 8192, nullptr, 1, nullptr, 0);
+    // Start the network task on Core 0
+    // The EthernetManager opens its own standard SPI bus on pins 11, 12, 13
+    xTaskCreatePinnedToCore(
+        screenTask,
+        "ScreenTask",
+        4096,
+        nullptr,
+        1,
+        nullptr,
+        1
+    );
+    xTaskCreatePinnedToCore(
+        networkTask,
+        "NetworkTask",
+        16384,
+        nullptr,
+        1,
+        nullptr,
+        1
+    );
+    lightEngine.begin();
 }
 
 void loop() {
