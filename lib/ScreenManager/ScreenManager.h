@@ -33,6 +33,7 @@ class ScreenManager {
         void popScreen();        // handmatig terug
     private:
         void draw();
+        bool initialized = false;
 
         ScreenState stack[SCREEN_STACK_DEPTH] = {};
         uint8_t stackTop = 0;

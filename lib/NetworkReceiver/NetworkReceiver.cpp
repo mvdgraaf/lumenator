@@ -21,10 +21,13 @@ NetworkReceiver::NetworkReceiver() : _buf{} {
 }
 
 bool NetworkReceiver::begin() {
+    _artStarted = false;
+    _sacnStarted = false;
     // Start luisteren naar Art-Net (mag blijven staan)
     configure(dmxUniverse, NUM_PIXELS);
     if (artnetEnabled) {
-        if (!_udpArt.begin(6454)) {
+        _artStarted = _udpArt.begin(6454) != 0;
+        if (!_artStarted) {
             safeSerialPrintln("[NETRX] Failed to bind UDP port 6454 (Art-Net)");
         } else {
             safeSerialPrintln("[NETRX] Listening for Art-Net on UDP/6454");
@@ -32,7 +35,8 @@ bool NetworkReceiver::begin() {
     }
 
     if (sacnEnabled) {
-        if (!_udpSacn.begin(5568)) {
+        _sacnStarted = _udpSacn.begin(5568) != 0;
+        if (!_sacnStarted) {
             safeSerialPrintln("[NETRX] Failed to bind UDP port 5568 (sACN)");
         } else {
             safeSerialPrintln("[NETRX] Listening for sACN (E1.31) on UDP/5568");
@@ -44,7 +48,8 @@ bool NetworkReceiver::begin() {
             uint8_t lowByte = currentUniverse & 0xFF;
             IPAddress sacnMulticastIP(239, 255, highByte, lowByte);
 
-            if (_udpSacn.beginMulticast(sacnMulticastIP, 5568)) {
+            _sacnStarted = _udpSacn.beginMulticast(sacnMulticastIP, 5568) != 0;
+            if (_sacnStarted) {
                 char buf[70];
                 snprintf(buf, sizeof(buf), "[NETRX] Joined sACN Multicast group 239.255.%u.%u (Uni %u)",
                                      highByte, lowByte, currentUniverse);
@@ -60,12 +65,14 @@ bool NetworkReceiver::begin() {
     if (!artnetEnabled && !sacnEnabled) {
         safeSerialPrintln("[NETRX] No network protocols enabled");
     }
-    return true;
+    return _artStarted || _sacnStarted;
 }
 
 void NetworkReceiver::end() {
-    _udpArt.stop();
-    _udpSacn.stop();
+    if (_artStarted) _udpArt.stop();
+    if (_sacnStarted) _udpSacn.stop();
+    _artStarted = false;
+    _sacnStarted = false;
     safeSerialPrintln("[NETRX] Stopped listening for Art-Net and sACN");
 }
 void NetworkReceiver::configure(uint16_t startUniverse, int totalPixels) {
@@ -78,14 +85,16 @@ void NetworkReceiver::configure(uint16_t startUniverse, int totalPixels) {
 }
 
 void NetworkReceiver::poll() {
-    int len = _udpArt.parsePacket();
+    // Ethernet 2.0.2 does not validate socket indices in parsePacket().
+    // Never poll a socket whose begin() was skipped or failed.
+    int len = _artStarted ? _udpArt.parsePacket() : 0;
     if (len > 0) {
         if (len > BUF_SIZE) len = BUF_SIZE;
         _udpArt.read(_buf, len);
         _handleArt(len, _udpArt.remoteIP(), _udpArt.remotePort());
     }
 
-    len = _udpSacn.parsePacket();
+    len = _sacnStarted ? _udpSacn.parsePacket() : 0;
     if (len > 0) {
         if (len > BUF_SIZE) len = BUF_SIZE;
         _udpSacn.read(_buf, len);
@@ -165,6 +174,15 @@ void NetworkReceiver::_handleSacn(int len, IPAddress remoteIP, uint16_t remotePo
         if (copyLen > 512) copyLen = 512;
 
         _dmx.setChannels(_buf + dmxStart + channelOffset, copyLen);
+        static bool loggedPacket = false;
+        static uint32_t lastLog = 0;
+        if (!loggedPacket || millis() - lastLog >= 1000) {
+            loggedPacket = true;
+            lastLog = millis();
+            Serial.printf("[NETRX] sACN from %s universe=%u channels=%d RGB=%u,%u,%u\n",
+                          remoteIP.toString().c_str(), static_cast<unsigned>(universe), copyLen,
+                          _dmx.getChannel(0), _dmx.getChannel(1), _dmx.getChannel(2));
+        }
 
         // static unsigned int logCount = 0;
         // if (++logCount % 30 == 0) {

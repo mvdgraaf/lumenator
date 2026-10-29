@@ -2,9 +2,9 @@
 
 Preferences preferences;
 
-bool dhcpEnabled = true; // Set to false for static IP
-bool artnetEnabled = true;
-bool sacnEnabled = false;
+bool dhcpEnabled = false; // Set to false for static IP
+bool artnetEnabled = false;
+bool sacnEnabled = true;
 uint16_t dmxUniverse = 1;
 IPAddress ipAddress(192, 168, 2, 100);
 IPAddress dns(192, 168, 2, 254);
@@ -32,8 +32,8 @@ void loadConfig() {
     preferences.begin("config", true);
 
     //dhcpEnabled = preferences.getBool("dhcpEnabled", false);
-    artnetEnabled = preferences.getBool("useArtnet", true);
-    sacnEnabled = preferences.getBool("useSACN", false);
+    artnetEnabled = preferences.getBool("useArtnet", artnetEnabled);
+    sacnEnabled = preferences.getBool("useSACN", sacnEnabled);
     dmxUniverse = preferences.getUInt("universe", 1);
 
     ipAddress = IPAddress(preferences.getUInt("ip", (uint32_t)IPAddress(192, 168, 2, 100)));
@@ -43,6 +43,10 @@ void loadConfig() {
 
     preferences.end();
     Serial.println("[Config] Loaded config");
+    Serial.printf("[Config] Art-Net=%s sACN=%s universe=%u DHCP=%s IP=%s\n",
+                  artnetEnabled ? "ON" : "OFF", sacnEnabled ? "ON" : "OFF",
+                  static_cast<unsigned>(dmxUniverse), dhcpEnabled ? "ON" : "OFF",
+                  ipAddress.toString().c_str());
 }
 
 void saveConfig() {

@@ -60,14 +60,33 @@ void mainMenu(ScreenManager*) {
 }
 
 void ScreenManager::begin() {
+    initialized = false;
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && defined(BOARD_HAS_PSRAM)
+    // These pins overlap the octal memory interface configured for this board.
+    if ((I2C_SDA >= 26 && I2C_SDA <= 37) ||
+        (I2C_SCL >= 26 && I2C_SCL <= 37)) {
+        Serial.println(F("[SM] Screen disabled: I2C pins overlap flash/PSRAM. Use free pins, e.g. SDA=8 SCL=18."));
+        return;
+    }
+#endif
     stackTop = 0;
     stack[0] = { .screen = ScreenId::Start, .expireAt = 0, .callback = startScreen };
-    Wire.begin(I2C_SDA, I2C_SCL);
-    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    if (!Wire.begin(I2C_SDA, I2C_SCL)) {
+        Serial.println(F("[SM] I2C initialization failed"));
+        return;
+    }
+    Wire.setTimeOut(50);
+    Wire.beginTransmission(0x3C);
+    if (Wire.endTransmission() != 0) {
         Serial.println(F("[SM] Display not found"));
         return;
     }
+    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C, true, false)) {
+        Serial.println(F("[SM] Display buffer allocation failed"));
+        return;
+    }
 
+    initialized = true;
     draw();
 
     stack[0] = { .screen = ScreenId::Home, .expireAt = 0, .callback = mainMenu };
@@ -75,6 +94,7 @@ void ScreenManager::begin() {
 }
 
 void ScreenManager::pushScreen(ScreenId id, void (*callback)(ScreenManager*), uint32_t durationMs) {
+    if (!initialized) return;
     if (stackTop + 1 >= SCREEN_STACK_DEPTH) {
         popScreen(); // simpele overflow-bescherming: oudste tijdelijke screen eruit
     }
@@ -88,6 +108,7 @@ void ScreenManager::pushScreen(ScreenId id, void (*callback)(ScreenManager*), ui
 }
 
 void ScreenManager::popScreen() {
+    if (!initialized) return;
     if (stackTop > 0) {
         stackTop--;
         draw();
@@ -95,6 +116,7 @@ void ScreenManager::popScreen() {
 }
 
 void ScreenManager::showMessage(const char* title, const char* message, uint32_t durationMs) {
+    if (!initialized) return;
     strncpy(msgTitle, title, sizeof(msgTitle) - 1);
     msgTitle[sizeof(msgTitle) - 1] = '\0';
     strncpy(msgBody, message, sizeof(msgBody) - 1);
@@ -111,12 +133,14 @@ void ScreenManager::showMessage(const char* title, const char* message, uint32_t
 }
 
 void ScreenManager::update() {
+    if (!initialized) return;
     if (stackTop > 0 && stack[stackTop].expireAt != 0 && millis() >= stack[stackTop].expireAt) {
         popScreen();
     }
 }
 
 void ScreenManager::draw() {
+    if (!initialized) return;
     if (stack[stackTop].callback) {
         stack[stackTop].callback(this);
     }

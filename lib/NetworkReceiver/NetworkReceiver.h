@@ -22,6 +22,8 @@ public:
 private:
     EthernetUDP _udpArt;
     EthernetUDP _udpSacn;
+    bool _artStarted = false;
+    bool _sacnStarted = false;
     DMXBuffer _dmx;
     static const int BUF_SIZE = 1024;
     uint8_t _buf[BUF_SIZE];
