@@ -27,7 +27,7 @@
 #define OUTPUT_3 41
 #define OUTPUT_4 42
 
-#define NUM_PIXELS 16
+#define NUM_PIXELS 60
 
 #define I2C_SDA 33
 #define I2C_SCL 34

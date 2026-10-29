@@ -26,7 +26,7 @@ static void networkTask(void* parameter) {
     while (true) {
         eth.update();
         netRx.poll();
-        lightEngine.update();
+        //lightEngine.update();
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
@@ -45,11 +45,11 @@ void setup() {
     while (!Serial && (millis() - start < 4000)) {
         delay(10);
     }
-
-    Serial.println("[MAIN] Starting Lumenator...");
-    screen.begin();
-    // Load configuration from non volatile memory
+    while (!Serial && (millis() - start < 4000)) { delay(10); }
+    delay(500);
+    Serial.println("[MAIN] loadConfig"); Serial.flush();
     loadConfig();
+    Serial.println("[MAIN] tasks"); Serial.flush();
 
     // Ensure the Ethernet chip is in standby and doesn't interfere during boot
     pinMode(W5500_RST, OUTPUT);
@@ -88,7 +88,9 @@ void setup() {
         nullptr,
         1
     );
+    Serial.println("[MAIN] lightEngine.begin"); Serial.flush();
     lightEngine.begin();
+    Serial.println("[MAIN] setup klaar"); Serial.flush();
 }
 
 void loop() {
